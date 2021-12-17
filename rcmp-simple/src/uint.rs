@@ -58,14 +58,14 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
-    /// let (sum, overflow) = num.overflowing_add(&UInt::new([0, 3]));
+    /// let mut sum = UInt::new([0; 2]);
+    /// let overflow = num.overflowing_add_into(&UInt::new([0, 3]), &mut sum);
     ///
     /// assert_eq!(sum, UInt::new([0, 1]));
     /// assert!(overflow);
     /// ```
-    pub fn overflowing_add(&self, rhs: &UInt<PRECISION>) -> (UInt<PRECISION>, bool) {
+    pub fn overflowing_add_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
         // This implementation is practically identical to the one in GMP.
-        let mut limbs = [0u32; PRECISION];
         let mut carry = 0u32;
         let (mut start, mut mid, mut res): (u32, u32, u32);
 
@@ -74,10 +74,10 @@ impl<const PRECISION: usize> UInt<PRECISION> {
             mid = start.wrapping_add(rhs.limbs[i]);
             res = mid.wrapping_add(carry);
             carry = (mid < start) as u32 | (res < mid) as u32;
-            limbs[i] = res;
+            into.limbs[i] = res;
         }
 
-        (UInt { limbs }, carry != 0)
+        carry != 0
     }
 
     /// Subtracts `rhs` from `self`, returning a new unsigned integer that is
@@ -89,7 +89,8 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([1, 0]);
-    /// let (dif, underflow) = num.overflowing_sub(&UInt::new([0, 1]));
+    /// let mut dif = UInt::new([0; 2]);
+    /// let underflow = num.overflowing_sub_into(&UInt::new([0, 1]), &mut dif);
     ///
     /// assert_eq!(dif, UInt::new([0, 0xFFFFFFFF]));
     /// assert!(!underflow);
@@ -99,14 +100,14 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0, 1]);
-    /// let (dif, underflow) = num.overflowing_sub(&UInt::new([0, 2]));
+    /// let mut dif = UInt::new([0; 2]);
+    /// let underflow = num.overflowing_sub_into(&UInt::new([0, 2]), &mut dif);
     ///
     /// assert_eq!(dif, UInt::new([0xFFFFFFFF, 0xFFFFFFFF]));
     /// assert!(underflow);
     /// ```
-    pub fn overflowing_sub(&self, rhs: &UInt<PRECISION>) -> (UInt<PRECISION>, bool) {
+    pub fn overflowing_sub_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
         // This implementation is practically identical to the one in GMP.
-        let mut limbs = [0u32; PRECISION];
         let mut borrow = 0u32;
         let (mut start, mut mid, mut res): (u32, u32, u32);
 
@@ -115,10 +116,10 @@ impl<const PRECISION: usize> UInt<PRECISION> {
             mid = start.wrapping_sub(rhs.limbs[i]);
             res = mid.wrapping_sub(borrow);
             borrow = (mid > start) as u32 | (res > mid) as u32;
-            limbs[i] = res;
+            into.limbs[i] = res;
         }
 
-        (UInt { limbs }, borrow != 0)
+        borrow != 0
     }
 }
 
@@ -131,7 +132,8 @@ impl<const PRECISION: usize> Add for UInt<PRECISION> {
     /// This function panics if an overflow occurs and debug assertions are
     /// enabled. Otherwise, this function will wrap.
     fn add(self, rhs: Self) -> Self::Output {
-        let (res, overflow) = self.overflowing_add(&rhs);
+        let mut res = UInt::new([0; PRECISION]);
+        let overflow = self.overflowing_add_into(&rhs, &mut res);
         debug_assert!(!overflow, "Add overflowed");
         res
     }
@@ -146,7 +148,8 @@ impl<const PRECISION: usize> Sub for UInt<PRECISION> {
     /// This function panics if an underflow occurs and debug assertions are
     /// enabled. Otherwise, this function will wrap.
     fn sub(self, rhs: Self) -> Self::Output {
-        let (res, underflow) = self.overflowing_sub(&rhs);
+        let mut res = UInt::new([0; PRECISION]);
+        let underflow = self.overflowing_sub_into(&rhs, &mut res);
         debug_assert!(!underflow, "Subtract underflowed");
         res
     }
@@ -159,24 +162,25 @@ mod tests {
     #[test]
     fn normal_add() {
         let num = UInt::new([0, 1]);
-        let new_num = num + UInt::new([0, 2]);
-        assert_eq!(new_num, UInt::new([0, 3]), "The result must be [0, 3]");
+        let sum = num + UInt::new([0, 2]);
+        assert_eq!(sum, UInt::new([0, 3]), "The result must be [0, 3]");
     }
 
     #[test]
     fn multi_precision_add() {
         let num = UInt::new([0, 0xFFFFFFFE]);
-        let new_num = num + UInt::new([0, 3]);
+        let sum = num + UInt::new([0, 3]);
 
-        assert_eq!(new_num, UInt::new([1, 1]), "The result must be [1, 1]");
+        assert_eq!(sum, UInt::new([1, 1]), "The result must be [1, 1]");
     }
 
     #[test]
     fn multi_precision_overflowing_add() {
         let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
-        let (new_num, overflow) = num.overflowing_add(&UInt::new([0, 3]));
+        let mut sum = UInt::new([0; 2]);
+        let overflow = num.overflowing_add_into(&UInt::new([0, 3]), &mut sum);
 
-        assert_eq!(new_num, UInt::new([0, 1]), "The result must be [0, 1]");
+        assert_eq!(sum, UInt::new([0, 1]), "The result must be [0, 1]");
         assert!(overflow, "There must be overflow");
     }
 
