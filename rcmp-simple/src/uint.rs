@@ -18,7 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// Unsigned integer extended fixed precision implementation.
 ///
@@ -51,8 +51,8 @@ impl<const PRECISION: usize> UInt<PRECISION> {
         UInt { limbs }
     }
 
-    /// Adds `self` and `rhs`, returning a new unsigned integer that is the sum
-    /// of these two numbers.
+    /// Adds `self` and `rhs`, storing the sum into `into`, returning `true` if
+    /// an overflow occured.
     ///
     /// # Example
     /// ```rust
@@ -80,10 +80,36 @@ impl<const PRECISION: usize> UInt<PRECISION> {
         carry != 0
     }
 
-    /// Subtracts `rhs` from `self`, returning a new unsigned integer that is
-    /// the difference between these two numbers.
+    /// Adds `self` and `rhs`, storing the sum into `self, returning `true` if
+    /// an overflow occurred.
     ///
-    /// The resulting `bool` is true if an underflow occurred.
+    /// # Example
+    /// ```rust
+    /// # use rcmp_simple::UInt;
+    /// let mut num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
+    /// let overflow = num.overflowing_add_mut(&UInt::new([0, 3]));
+    ///
+    /// assert_eq!(num, UInt::new([0, 1]));
+    /// assert!(overflow);
+    /// ```
+    pub fn overflowing_add_mut(&mut self, rhs: &UInt<PRECISION>) -> bool {
+        // This implementation is practically identical to the one in GMP.
+        let mut carry = 0u32;
+        let (mut start, mut mid, mut res): (u32, u32, u32);
+
+        for i in (0..PRECISION).rev() {
+            start = self.limbs[i];
+            mid = start.wrapping_add(rhs.limbs[i]);
+            res = mid.wrapping_add(carry);
+            carry = (mid < start) as u32 | (res < mid) as u32;
+            self.limbs[i] = res;
+        }
+
+        carry != 0
+    }
+
+    /// Subtracts `rhs` from `self`, storing the difference into `into`,
+    /// returning `true` if an underflow occurred.
     ///
     /// # Examples
     /// ```rust
@@ -121,6 +147,34 @@ impl<const PRECISION: usize> UInt<PRECISION> {
 
         borrow != 0
     }
+
+    /// Subtracts `rhs` from `self`, storing the difference into `self`,
+    /// returning `true` if an underflow occurred.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use rcmp_simple::UInt;
+    /// let mut num = UInt::new([0, 1]);
+    /// let underflow = num.overflowing_sub_mut(&UInt::new([0, 2]));
+    ///
+    /// assert_eq!(num, UInt::new([0xFFFFFFFF, 0xFFFFFFFF]));
+    /// assert!(underflow);
+    /// ```
+    pub fn overflowing_sub_mut(&mut self, rhs: &UInt<PRECISION>) -> bool {
+        // This implementation is practically identical to the one in GMP.
+        let mut borrow = 0u32;
+        let (mut start, mut mid, mut res): (u32, u32, u32);
+
+        for i in (0..PRECISION).rev() {
+            start = self.limbs[i];
+            mid = start.wrapping_sub(rhs.limbs[i]);
+            res = mid.wrapping_sub(borrow);
+            borrow = (mid > start) as u32 | (res > mid) as u32;
+            self.limbs[i] = res;
+        }
+
+        borrow != 0
+    }
 }
 
 impl<const PRECISION: usize> Add for UInt<PRECISION> {
@@ -152,6 +206,30 @@ impl<const PRECISION: usize> Sub for UInt<PRECISION> {
         let underflow = self.overflowing_sub_into(&rhs, &mut res);
         debug_assert!(!underflow, "Subtract underflowed");
         res
+    }
+}
+
+impl<const PRECISION: usize> AddAssign for UInt<PRECISION> {
+    /// Performs the `+=` operation.
+    ///
+    /// # Panics
+    /// This function panics if an overflow occurs and debug assertions are
+    /// enabled. Otherwise, this function will wrap.
+    fn add_assign(&mut self, rhs: Self) {
+        let overflow = self.overflowing_add_mut(&rhs);
+        debug_assert!(!overflow, "Add overflowed");
+    }
+}
+
+impl<const PRECISION: usize> SubAssign for UInt<PRECISION> {
+    /// Performs the `-=` operation.
+    ///
+    /// # Panics
+    /// This function panics if an underflow occurs and debug assertions are
+    /// enabled. Otherwise this function will wrap.
+    fn sub_assign(&mut self, rhs: Self) {
+        let underflow = self.overflowing_sub_mut(&rhs);
+        debug_assert!(!underflow, "Subtract underflowed");
     }
 }
 
