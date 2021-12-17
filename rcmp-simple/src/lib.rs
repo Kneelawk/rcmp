@@ -36,4 +36,4 @@
 
 mod uint;
 
-pub use uint::UnsignedInteger;
+pub use uint::UInt;
