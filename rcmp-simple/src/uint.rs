@@ -25,6 +25,15 @@ use std::ops::Add;
 /// This only holds positive integers or 0. This struct is generic over
 /// precision. All operations are precision-consistent, returning unsigned
 /// integers with the same precision as that of the inputs.
+///
+/// # Example
+/// ```rust
+/// # use rcmp_simple::UInt;
+/// let num = UInt::new([0, 0xFFFFFFFE]);
+/// let sum = num + UInt::new([0, 3]);
+///
+/// assert_eq!(sum, UInt::new([1, 1]));
+/// ```
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct UInt<const PRECISION: usize> {
     /// Numbers are stored with the most significant limb first (at the smallest
@@ -44,6 +53,16 @@ impl<const PRECISION: usize> UInt<PRECISION> {
 
     /// Adds `self` and `rhs` returning a new natural number that is the sum of
     /// these two numbers.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rcmp_simple::UInt;
+    /// let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
+    /// let (sum, overflow) = num.overflowing_add(&UInt::new([0, 3]));
+    ///
+    /// assert_eq!(sum, UInt::new([0, 1]));
+    /// assert!(overflow);
+    /// ```
     pub fn overflowing_add(&self, rhs: &UInt<PRECISION>) -> (UInt<PRECISION>, bool) {
         let mut limbs = [0u32; PRECISION];
         let mut carry = false;
@@ -62,6 +81,11 @@ impl<const PRECISION: usize> UInt<PRECISION> {
 impl<const PRECISION: usize> Add for UInt<PRECISION> {
     type Output = Self;
 
+    /// Performs the `+` operation.
+    ///
+    /// # Panics
+    /// This function panics if an overflow occurs and debug assertions are
+    /// enabled. Otherwise, this function will wrap.
     fn add(self, rhs: Self) -> Self::Output {
         let (res, overflow) = self.overflowing_add(&rhs);
         debug_assert!(!overflow, "Add overflowed");
