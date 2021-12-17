@@ -19,7 +19,10 @@
 //! This library is a simple concept implementation of multiprecision algorithms
 //! in rust. The name RCMP stands for Rust Concept Multi-Precision. This library
 //! is called a multiprecision library, however, the intended use of this
-//! library is actually just to provide expanded, fixed precision types.
+//! library is actually just to provide expanded, fixed precision types. A more
+//! apt name for this library might be Rust Concept Fixed-Precision, however
+//! this creates the acronym RCFP which could easily be confused with Rust
+//! Concept Floating Point.
 //!
 //! This library is intended for use in a fractal generator. These
 //! implementations are designed to allow me to understand the mechanisms of
@@ -31,8 +34,30 @@
 //!   “Seminumerical Algorithms”, 1st edition, Addison-Wesley, 1969.
 //! * The source code of the GNU MP library as of 2022.
 //!
+//! # Types
+//! This library provides these types for performing fixed-precision arithmetic:
+//! * [`UInt`] - This type is an unsigned integer type with
+//!   compile-time-arbitrary fixed-precision.
+//! * [`UDec`] - This type is an unsigned decimal type with
+//!   compile-time-arbitrary fixed-precision and fixed-point.
+//! * [`Dec`] - This type is a signed decimal type with compile-time-arbitrary
+//!   fixed-precision and fixed-point. This type is the goal for WGSL
+//!   implementation and the endpoint for Rust implementation.
+//!
 //! # Examples
-//! As content is added to this library, doctest examples will be added here.
+//! Each type implements basic arithmetic operations such as addition,
+//! subtraction, multiplication, and division. The goal is also for the [`Dec`]
+//! type to implement more complicated operations such as squaring,
+//! exponentiation (e^x), and trigonometric functions.
+//!
+//! An example of simple arithmetic using the [`UInt`] type:
+//! ```rust
+//! # use rcmp_simple::UInt;
+//! let num = UInt::new([0, 0xFFFFFFFE]);
+//! let sum = num + UInt::new([0, 5]);
+//!
+//! assert_eq!(sum, UInt::new([1, 3]));
+//! ```
 
 mod uint;
 
