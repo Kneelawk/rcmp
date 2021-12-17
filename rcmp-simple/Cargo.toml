@@ -1,0 +1,8 @@
+[package]
+name = "rcmp-simple"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kneelawk <kneelawk@gmail.com>"]
+description = "A simple concept implementation of multiprecision algorithms in rust."
+
+[dependencies]
