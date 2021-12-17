@@ -18,5 +18,5 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/// Unsigned decimal extended fixed precision with fixed point.
+/// Unsigned decimal extended fixed precision implementation with fixed point.
 pub struct UDec {}

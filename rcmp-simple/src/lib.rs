@@ -48,7 +48,7 @@
 //! Each type implements basic arithmetic operations such as addition,
 //! subtraction, multiplication, and division. The goal is also for the [`Dec`]
 //! type to implement more complicated operations such as squaring,
-//! exponentiation (e^x), and trigonometric functions.
+//! exponentiation (e<sup>x</sup>), and trigonometric functions.
 //!
 //! An example of simple arithmetic using the [`UInt`] type:
 //! ```rust
