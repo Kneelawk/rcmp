@@ -59,6 +59,10 @@
 //! assert_eq!(sum, UInt::new([1, 3]));
 //! ```
 
+mod dec;
+mod udec;
 mod uint;
 
+pub use dec::Dec;
+pub use udec::UDec;
 pub use uint::UInt;
