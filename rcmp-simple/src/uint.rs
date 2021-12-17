@@ -64,17 +64,22 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(overflow);
     /// ```
     pub fn overflowing_add(&self, rhs: &UInt<PRECISION>) -> (UInt<PRECISION>, bool) {
+        // This implementation is practically identical to the one in GMP.
         let mut limbs = [0u32; PRECISION];
-        let mut carry = false;
+        let mut carry = 0u32;
+
+        let (mut a, mut b, mut mid, mut res);
 
         for i in (0..PRECISION).rev() {
-            limbs[i] = self.limbs[i]
-                .wrapping_add(rhs.limbs[i])
-                .wrapping_add(if carry { 1 } else { 0 });
-            carry = limbs[i] < self.limbs[i];
+            a = self.limbs[i];
+            b = rhs.limbs[i];
+            mid = a.wrapping_add(b);
+            res = mid.wrapping_add(carry);
+            carry = (mid < a) as u32 | (res < mid) as u32;
+            limbs[i] = res;
         }
 
-        (UInt { limbs }, carry)
+        (UInt { limbs }, carry != 0)
     }
 }
 
@@ -119,5 +124,13 @@ mod tests {
 
         assert_eq!(new_num, UInt::new([0, 1]), "The result must be [0, 1]");
         assert!(overflow, "There must be overflow");
+    }
+
+    #[test]
+    fn multi_precision_carry_add() {
+        let num = UInt::new([0, 0, 1]);
+        let sum = num + UInt::new([0, 0xFFFFFFFF, 0xFFFFFFFF]);
+
+        assert_eq!(sum, UInt::new([1, 0, 0]), "The result must be [1, 0, 0]");
     }
 }
