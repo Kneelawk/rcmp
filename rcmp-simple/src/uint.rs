@@ -20,10 +20,11 @@
 
 use std::ops::Add;
 
-/// Natural number extended fixed precision implementation. This only holds
-/// positive integers or 0. This struct is generic over precision. All
-/// operations are precision-consistent, returning natural numbers with the same
-/// precision as that of the inputs.
+/// Natural number extended fixed precision implementation.
+///
+/// This only holds positive integers or 0. This struct is generic over
+/// precision. All operations are precision-consistent, returning natural
+/// numbers with the same precision as that of the inputs.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct UnsignedInteger<const PRECISION: usize> {
     /// Numbers are stored with the most significant limb first (at the smallest
