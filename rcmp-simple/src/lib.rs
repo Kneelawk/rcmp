@@ -17,10 +17,13 @@
 //! # Examples
 //! As content is added to this library, doctest examples will be added here.
 
+use std::ops::Add;
+
 /// Natural number extended fixed precision implementation. This only holds
 /// positive integers or 0. This struct is generic over precision. All
 /// operations are precision-consistent, returning natural numbers with the same
 /// precision as that of the inputs.
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct NaturalNumber<const PRECISION: usize> {
     /// Numbers are stored with the most significant limb first (at the smallest
     /// index) and the least significant limb last (at the largest index).
@@ -28,6 +31,15 @@ pub struct NaturalNumber<const PRECISION: usize> {
 }
 
 impl<const PRECISION: usize> NaturalNumber<PRECISION> {
+    /// Creates a new natural number with the given limbs.
+    ///
+    /// Numbers in the limbs are stored with the most significant limb first (at
+    /// the smallest index) and the least significant limb last (at the largest
+    /// index).
+    pub fn new(limbs: [u32; PRECISION]) -> NaturalNumber<PRECISION> {
+        NaturalNumber { limbs }
+    }
+
     /// Adds `self` and `rhs` returning a new natural number that is the sum of
     /// these two numbers.
     pub fn overflowing_add(
@@ -48,11 +60,41 @@ impl<const PRECISION: usize> NaturalNumber<PRECISION> {
     }
 }
 
+impl<const PRECISION: usize> Add for NaturalNumber<PRECISION> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let (res, overflow) = self.overflowing_add(&rhs);
+        debug_assert!(!overflow, "Add overflowed");
+        res
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::NaturalNumber;
+
     #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    fn normal_overflowing_add() {
+        let num = NaturalNumber::new([0, 1]);
+        let (new_num, overflow) = num.overflowing_add(&NaturalNumber::new([0, 2]));
+
+        assert_eq!(
+            new_num,
+            NaturalNumber::new([0, 3]),
+            "The result must be [0, 3]"
+        );
+        assert!(!overflow, "There must not be any overflow");
+    }
+
+    #[test]
+    fn normal_add() {
+        let num = NaturalNumber::new([0, 1]);
+        let new_num = num + NaturalNumber::new([0, 2]);
+        assert_eq!(
+            new_num,
+            NaturalNumber::new([0, 3]),
+            "The result must be [0, 3]"
+        );
     }
 }
