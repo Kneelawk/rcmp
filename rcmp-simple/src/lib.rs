@@ -91,19 +91,6 @@ mod tests {
     use crate::UnsignedInteger;
 
     #[test]
-    fn normal_overflowing_add() {
-        let num = UnsignedInteger::new([0, 1]);
-        let (new_num, overflow) = num.overflowing_add(&UnsignedInteger::new([0, 2]));
-
-        assert_eq!(
-            new_num,
-            UnsignedInteger::new([0, 3]),
-            "The result must be [0, 3]"
-        );
-        assert!(!overflow, "There must not be any overflow");
-    }
-
-    #[test]
     fn normal_add() {
         let num = UnsignedInteger::new([0, 1]);
         let new_num = num + UnsignedInteger::new([0, 2]);
@@ -112,5 +99,30 @@ mod tests {
             UnsignedInteger::new([0, 3]),
             "The result must be [0, 3]"
         );
+    }
+
+    #[test]
+    fn multi_precision_add() {
+        let num = UnsignedInteger::new([0, 0xFFFFFFFE]);
+        let new_num = num + UnsignedInteger::new([0, 3]);
+
+        assert_eq!(
+            new_num,
+            UnsignedInteger::new([1, 1]),
+            "The result must be [1, 1]"
+        );
+    }
+
+    #[test]
+    fn multi_precision_overflowing_add() {
+        let num = UnsignedInteger::new([0xFFFFFFFF, 0xFFFFFFFE]);
+        let (new_num, overflow) = num.overflowing_add(&UnsignedInteger::new([0, 3]));
+
+        assert_eq!(
+            new_num,
+            UnsignedInteger::new([0, 1]),
+            "The result must be [0, 1]"
+        );
+        assert!(overflow, "There must be overflow");
     }
 }
