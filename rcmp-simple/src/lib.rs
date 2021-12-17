@@ -24,28 +24,28 @@ use std::ops::Add;
 /// operations are precision-consistent, returning natural numbers with the same
 /// precision as that of the inputs.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct NaturalNumber<const PRECISION: usize> {
+pub struct UnsignedInteger<const PRECISION: usize> {
     /// Numbers are stored with the most significant limb first (at the smallest
     /// index) and the least significant limb last (at the largest index).
     limbs: [u32; PRECISION],
 }
 
-impl<const PRECISION: usize> NaturalNumber<PRECISION> {
+impl<const PRECISION: usize> UnsignedInteger<PRECISION> {
     /// Creates a new natural number with the given limbs.
     ///
     /// Numbers in the limbs are stored with the most significant limb first (at
     /// the smallest index) and the least significant limb last (at the largest
     /// index).
-    pub fn new(limbs: [u32; PRECISION]) -> NaturalNumber<PRECISION> {
-        NaturalNumber { limbs }
+    pub fn new(limbs: [u32; PRECISION]) -> UnsignedInteger<PRECISION> {
+        UnsignedInteger { limbs }
     }
 
     /// Adds `self` and `rhs` returning a new natural number that is the sum of
     /// these two numbers.
     pub fn overflowing_add(
         &self,
-        rhs: &NaturalNumber<PRECISION>,
-    ) -> (NaturalNumber<PRECISION>, bool) {
+        rhs: &UnsignedInteger<PRECISION>,
+    ) -> (UnsignedInteger<PRECISION>, bool) {
         let mut limbs = [0u32; PRECISION];
         let mut carry = false;
 
@@ -56,11 +56,11 @@ impl<const PRECISION: usize> NaturalNumber<PRECISION> {
             carry = limbs[i] < self.limbs[i];
         }
 
-        (NaturalNumber { limbs }, carry)
+        (UnsignedInteger { limbs }, carry)
     }
 }
 
-impl<const PRECISION: usize> Add for NaturalNumber<PRECISION> {
+impl<const PRECISION: usize> Add for UnsignedInteger<PRECISION> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -72,16 +72,16 @@ impl<const PRECISION: usize> Add for NaturalNumber<PRECISION> {
 
 #[cfg(test)]
 mod tests {
-    use crate::NaturalNumber;
+    use crate::UnsignedInteger;
 
     #[test]
     fn normal_overflowing_add() {
-        let num = NaturalNumber::new([0, 1]);
-        let (new_num, overflow) = num.overflowing_add(&NaturalNumber::new([0, 2]));
+        let num = UnsignedInteger::new([0, 1]);
+        let (new_num, overflow) = num.overflowing_add(&UnsignedInteger::new([0, 2]));
 
         assert_eq!(
             new_num,
-            NaturalNumber::new([0, 3]),
+            UnsignedInteger::new([0, 3]),
             "The result must be [0, 3]"
         );
         assert!(!overflow, "There must not be any overflow");
@@ -89,11 +89,11 @@ mod tests {
 
     #[test]
     fn normal_add() {
-        let num = NaturalNumber::new([0, 1]);
-        let new_num = num + NaturalNumber::new([0, 2]);
+        let num = UnsignedInteger::new([0, 1]);
+        let new_num = num + UnsignedInteger::new([0, 2]);
         assert_eq!(
             new_num,
-            NaturalNumber::new([0, 3]),
+            UnsignedInteger::new([0, 3]),
             "The result must be [0, 3]"
         );
     }
