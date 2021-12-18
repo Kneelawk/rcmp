@@ -18,7 +18,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+
+use crate::util::mul_hi_low;
 
 /// Unsigned integer extended fixed precision implementation.
 ///
@@ -175,6 +177,74 @@ impl<const PRECISION: usize> UInt<PRECISION> {
 
         borrow != 0
     }
+
+    /// Multiplies `rhs` by `self`, storing the lower half of the result into
+    /// `into`, returning true if the upper half of the result would be
+    /// non-zero.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use rcmp_simple::UInt;
+    /// let num = UInt::new([0, 0xFFFFFFFF]);
+    /// let mut prod = UInt::new([0; 2]);
+    /// let overflow = num.overflowing_mul_into(&UInt::new([0, 0xFFFFFFFF]), &mut prod);
+    ///
+    /// assert_eq!(prod, UInt::new([0xFFFFFFFE, 0x00000001]));
+    /// assert!(!overflow);
+    /// ```
+    ///
+    /// An example of when an overflow might occur:
+    /// ```rust
+    /// # use rcmp_simple::UInt;
+    /// let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFF]);
+    /// let mut prod = UInt::new([0; 2]);
+    /// let overflow = num.overflowing_mul_into(&UInt::new([0xFFFFFFFF, 0xFFFFFFFF]), &mut prod);
+    ///
+    /// assert_eq!(prod, UInt::new([0x00000000, 0x00000001]));
+    /// assert!(overflow);
+    /// ```
+    pub fn overflowing_mul_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
+        let mut overflow = false;
+
+        for j in (0..PRECISION).rev() {
+            let b = rhs.limbs[j];
+
+            // Here, we're multiplying everything by `b` so if `b == 0` then nothing is
+            // happening, so let's just skip it entirely.
+            if b != 0 {
+                // Here, we're adding up every limb multiplied by `b`.
+                let mut carry = 0u32;
+                for i in (0..PRECISION).rev() {
+                    // We only care about the lower half of the multiplication, so we only calculate
+                    // this if `i + j` refer to the less-significant (higher-index) half.
+                    let k = i + j;
+                    if k >= (PRECISION - 1) {
+                        // The `into` int should only contain the less-significant half, so the
+                        // index into it is the index into the less-significant half.
+                        let k = k - (PRECISION - 1);
+                        let (mut t_high, t_low) = mul_hi_low(self.limbs[i], b);
+
+                        // Add anything else that was already in this limb. This is how carries work
+                        // across `j` values.
+                        let t_low2 = t_low.wrapping_add(into.limbs[k]);
+                        t_high += (t_low2 < t_low) as u32;
+
+                        // Add the carry.
+                        let t_low3 = t_low2.wrapping_add(carry);
+                        t_high += (t_low3 < t_low2) as u32;
+
+                        // Next we assign the least-significant 32 bits into the current limb and
+                        // carry everything left over to the next limb.
+                        carry = t_high;
+                        into.limbs[k] = t_low3;
+                    }
+                }
+                overflow |= carry != 0;
+            }
+        }
+
+        overflow
+    }
 }
 
 impl<const PRECISION: usize> Add for UInt<PRECISION> {
@@ -209,6 +279,22 @@ impl<const PRECISION: usize> Sub for UInt<PRECISION> {
     }
 }
 
+impl<const PRECISION: usize> Mul for UInt<PRECISION> {
+    type Output = Self;
+
+    /// Performs the `*` operation.
+    ///
+    /// # Panics
+    /// This function panics if an overflow occurs and debug assertions are
+    /// enabled. Otherwise, this function will wrap.
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = UInt::new([0; PRECISION]);
+        let overflow = self.overflowing_mul_into(&rhs, &mut res);
+        debug_assert!(!overflow, "Multiply overflowed");
+        res
+    }
+}
+
 impl<const PRECISION: usize> AddAssign for UInt<PRECISION> {
     /// Performs the `+=` operation.
     ///
@@ -230,6 +316,20 @@ impl<const PRECISION: usize> SubAssign for UInt<PRECISION> {
     fn sub_assign(&mut self, rhs: Self) {
         let underflow = self.overflowing_sub_mut(&rhs);
         debug_assert!(!underflow, "Subtract underflowed");
+    }
+}
+
+impl<const PRECISION: usize> MulAssign for UInt<PRECISION> {
+    /// Performs the `*=` operation.
+    ///
+    /// # Panics
+    /// This function panics if an overflow occurs and debug assertions are
+    /// enabled. Otherwise this function will wrap.
+    fn mul_assign(&mut self, rhs: Self) {
+        let mut res = UInt::new([0; PRECISION]);
+        let overflow = self.overflowing_mul_into(&rhs, &mut res);
+        debug_assert!(!overflow, "Multiply overflowed");
+        *self = res;
     }
 }
 
@@ -287,6 +387,43 @@ mod tests {
             dif,
             UInt::new([0, 0xFFFFFFFF, 0xFFFFFFFF]),
             "The result should be [0, 0xFFFFFFFF, 0xFFFFFFFF]"
+        );
+    }
+
+    #[test]
+    fn normal_mul() {
+        let num = UInt::new([0, 2]);
+        let prod = num * UInt::new([0, 3]);
+
+        assert_eq!(prod, UInt::new([0, 6]), "The result should be [0, 6]");
+
+        let mut num = UInt::new([0, 2]);
+        num *= UInt::new([0, 3]);
+
+        assert_eq!(num, UInt::new([0, 6]), "The result should be [0, 6]");
+    }
+
+    #[test]
+    fn four_precision_mul() {
+        let num = UInt::new([0, 0, 0xFFFFFFFF, 0xFFFFFFFF]);
+        let prod = num.clone() * num;
+
+        assert_eq!(
+            prod,
+            UInt::new([0xFFFFFFFF, 0xFFFFFFFE, 0x00000000, 0x00000001]),
+            "The result should be [0xFFFFFFFF, 0xFFFFFFFE, 0x00000000, 0x00000001]"
+        );
+    }
+
+    #[test]
+    fn four_precision_mul_2() {
+        let num = UInt::new([0, 0, 0xFFFFFFFF, 0]);
+        let prod = num.clone() * num;
+
+        assert_eq!(
+            prod,
+            UInt::new([0xFFFFFFFE, 0x00000001, 0, 0]),
+            "The result should be [0xFFFFFFFE, 0x00000001, 0x00000000, 0x00000000]"
         );
     }
 }

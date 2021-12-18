@@ -62,6 +62,7 @@
 mod dec;
 mod udec;
 mod uint;
+mod util;
 
 pub use dec::Dec;
 pub use udec::UDec;
