@@ -22,6 +22,7 @@
 ///
 /// # Returns
 /// This returns `u32` in the order (`high`, `low`).
+#[inline]
 pub fn mul_hi_low(a: u32, b: u32) -> (u32, u32) {
     // We perform this multiplication without using `u64`s by breaking each `u32` up
     // into two 16-bit pieces and multiplying those.
@@ -34,19 +35,20 @@ pub fn mul_hi_low(a: u32, b: u32) -> (u32, u32) {
     let mid1 = ah * bl;
     let mid2 = al * bh;
 
-    let mut carry = 0u32;
     let low = al * bl;
     let low2 = low.wrapping_add((mid1 & 0xFFFF) << 0x10);
-    carry += (low2 < low) as u32;
     let low3 = low2.wrapping_add((mid2 & 0xFFFF) << 0x10);
-    carry += (low3 < low2) as u32;
-    let high = ah * bh + ((mid1 >> 0x10) & 0xFFFF) + ((mid2 >> 0x10) & 0xFFFF) + carry;
+    let high = ah * bh
+        + ((mid1 >> 0x10) & 0xFFFF)
+        + ((mid2 >> 0x10) & 0xFFFF)
+        + (low2 < low) as u32
+        + (low3 < low2) as u32;
 
     (high, low3)
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::util::mul_hi_low;
 
     #[test]

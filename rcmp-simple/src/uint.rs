@@ -222,20 +222,25 @@ impl<const PRECISION: usize> UInt<PRECISION> {
                         // The `into` int should only contain the less-significant half, so the
                         // index into it is the index into the less-significant half.
                         let k = k - (PRECISION - 1);
-                        let (mut t_high, t_low) = mul_hi_low(self.limbs[i], b);
+                        let (t_high, t_low) = mul_hi_low(self.limbs[i], b);
 
-                        // Add anything else that was already in this limb. This is how carries work
-                        // across `j` values.
-                        let t_low2 = t_low.wrapping_add(into.limbs[k]);
-                        t_high += (t_low2 < t_low) as u32;
+                        // Ignore what was previously in this limb if this is the first `j` pass.
+                        let (t_high2, t_low2) = if j < PRECISION - 1 {
+                            // Add anything else that was already in this limb. This is how carries
+                            // work across `j` values.
+                            let t_low2 = t_low.wrapping_add(into.limbs[k]);
+                            let t_high2 = t_high + (t_low2 < t_low) as u32;
+                            (t_high2, t_low2)
+                        } else {
+                            (t_high, t_low)
+                        };
 
                         // Add the carry.
                         let t_low3 = t_low2.wrapping_add(carry);
-                        t_high += (t_low3 < t_low2) as u32;
 
                         // Next we assign the least-significant 32 bits into the current limb and
                         // carry everything left over to the next limb.
-                        carry = t_high;
+                        carry = t_high2 + (t_low3 < t_low2) as u32;
                         into.limbs[k] = t_low3;
                     }
                 }
