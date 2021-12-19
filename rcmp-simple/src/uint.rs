@@ -60,7 +60,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
-    /// let mut sum = UInt::new([0; 2]);
+    /// let mut sum = Default::default();
     /// let overflow = num.overflowing_add_into(&UInt::new([0, 3]), &mut sum);
     ///
     /// assert_eq!(sum, UInt::new([0, 1]));
@@ -117,7 +117,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([1, 0]);
-    /// let mut dif = UInt::new([0; 2]);
+    /// let mut dif = Default::default();
     /// let underflow = num.overflowing_sub_into(&UInt::new([0, 1]), &mut dif);
     ///
     /// assert_eq!(dif, UInt::new([0, 0xFFFFFFFF]));
@@ -128,7 +128,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0, 1]);
-    /// let mut dif = UInt::new([0; 2]);
+    /// let mut dif = Default::default();
     /// let underflow = num.overflowing_sub_into(&UInt::new([0, 2]), &mut dif);
     ///
     /// assert_eq!(dif, UInt::new([0xFFFFFFFF, 0xFFFFFFFF]));
@@ -186,7 +186,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0, 0xFFFFFFFF]);
-    /// let mut prod = UInt::new([0; 2]);
+    /// let mut prod = Default::default();
     /// let overflow = num.overflowing_mul_into(&UInt::new([0, 0xFFFFFFFF]), &mut prod);
     ///
     /// assert_eq!(prod, UInt::new([0xFFFFFFFE, 0x00000001]));
@@ -197,7 +197,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// ```rust
     /// # use rcmp_simple::UInt;
     /// let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFF]);
-    /// let mut prod = UInt::new([0; 2]);
+    /// let mut prod = Default::default();
     /// let overflow = num.overflowing_mul_into(&UInt::new([0xFFFFFFFF, 0xFFFFFFFF]), &mut prod);
     ///
     /// assert_eq!(prod, UInt::new([0x00000000, 0x00000001]));
@@ -252,6 +252,12 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     }
 }
 
+impl<const PRECISION: usize> Default for UInt<PRECISION> {
+    fn default() -> Self {
+        UInt::new([0; PRECISION])
+    }
+}
+
 impl<const PRECISION: usize> Add for UInt<PRECISION> {
     type Output = Self;
 
@@ -261,7 +267,7 @@ impl<const PRECISION: usize> Add for UInt<PRECISION> {
     /// This function panics if an overflow occurs and debug assertions are
     /// enabled. Otherwise, this function will wrap.
     fn add(self, rhs: Self) -> Self::Output {
-        let mut res = UInt::new([0; PRECISION]);
+        let mut res = Default::default();
         let overflow = self.overflowing_add_into(&rhs, &mut res);
         debug_assert!(!overflow, "Add overflowed");
         res
@@ -277,7 +283,7 @@ impl<const PRECISION: usize> Sub for UInt<PRECISION> {
     /// This function panics if an underflow occurs and debug assertions are
     /// enabled. Otherwise, this function will wrap.
     fn sub(self, rhs: Self) -> Self::Output {
-        let mut res = UInt::new([0; PRECISION]);
+        let mut res = Default::default();
         let underflow = self.overflowing_sub_into(&rhs, &mut res);
         debug_assert!(!underflow, "Subtract underflowed");
         res
@@ -293,7 +299,7 @@ impl<const PRECISION: usize> Mul for UInt<PRECISION> {
     /// This function panics if an overflow occurs and debug assertions are
     /// enabled. Otherwise, this function will wrap.
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut res = UInt::new([0; PRECISION]);
+        let mut res = Default::default();
         let overflow = self.overflowing_mul_into(&rhs, &mut res);
         debug_assert!(!overflow, "Multiply overflowed");
         res
@@ -331,7 +337,7 @@ impl<const PRECISION: usize> MulAssign for UInt<PRECISION> {
     /// This function panics if an overflow occurs and debug assertions are
     /// enabled. Otherwise this function will wrap.
     fn mul_assign(&mut self, rhs: Self) {
-        let mut res = UInt::new([0; PRECISION]);
+        let mut res = Default::default();
         let overflow = self.overflowing_mul_into(&rhs, &mut res);
         debug_assert!(!overflow, "Multiply overflowed");
         *self = res;
@@ -360,7 +366,7 @@ mod tests {
     #[test]
     fn multi_precision_overflowing_add() {
         let num = UInt::new([0xFFFFFFFF, 0xFFFFFFFE]);
-        let mut sum = UInt::new([0; 2]);
+        let mut sum = Default::default();
         let overflow = num.overflowing_add_into(&UInt::new([0, 3]), &mut sum);
 
         assert_eq!(sum, UInt::new([0, 1]), "The result must be [0, 1]");
