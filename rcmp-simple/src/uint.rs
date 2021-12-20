@@ -20,7 +20,7 @@
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
-use crate::util::mul_hi_low;
+use crate::util::{addmul_1, mul_1};
 
 /// Unsigned integer extended fixed precision implementation.
 ///
@@ -36,6 +36,10 @@ use crate::util::mul_hi_low;
 ///
 /// assert_eq!(sum, UInt::new([1, 1]));
 /// ```
+///
+/// # Notes
+/// Note: `PRECISION` must always be `1` or greater. If `PRECISION == 0` then
+/// this object will panic when various methods are called.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct UInt<const PRECISION: usize> {
     /// Numbers are stored with the most significant limb first (at the smallest
@@ -204,47 +208,25 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(overflow);
     /// ```
     pub fn overflowing_mul_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
-        let mut overflow = false;
+        // Perform the first multiplication without adding so we don't incorporate
+        // existing `into` data into our calculation.
+        let mut overflow = mul_1(&self.limbs, rhs.limbs[PRECISION - 1], &mut into.limbs, 0) != 0;
 
-        for j in (0..PRECISION).rev() {
+        for j in (0..(PRECISION - 1)).rev() {
             let b = rhs.limbs[j];
 
             // Here, we're multiplying everything by `b` so if `b == 0` then nothing is
             // happening, so let's just skip it entirely.
             if b != 0 {
-                // Here, we're adding up every limb multiplied by `b`.
-                let mut carry = 0u32;
-                for i in (0..PRECISION).rev() {
-                    // We only care about the lower half of the multiplication, so we only calculate
-                    // this if `i + j` refer to the less-significant (higher-index) half.
-                    let k = i + j;
-                    if k >= (PRECISION - 1) {
-                        // The `into` int should only contain the less-significant half, so the
-                        // index into it is the index into the less-significant half.
-                        let k = k - (PRECISION - 1);
-                        let (t_high, t_low) = mul_hi_low(self.limbs[i], b);
-
-                        // Ignore what was previously in this limb if this is the first `j` pass.
-                        let (t_high2, t_low2) = if j < PRECISION - 1 {
-                            // Add anything else that was already in this limb. This is how carries
-                            // work across `j` values.
-                            let t_low2 = t_low.wrapping_add(into.limbs[k]);
-                            let t_high2 = t_high + (t_low2 < t_low) as u32;
-                            (t_high2, t_low2)
-                        } else {
-                            (t_high, t_low)
-                        };
-
-                        // Add the carry.
-                        let t_low3 = t_low2.wrapping_add(carry);
-
-                        // Next we assign the least-significant 32 bits into the current limb and
-                        // carry everything left over to the next limb.
-                        carry = t_high2 + (t_low3 < t_low2) as u32;
-                        into.limbs[k] = t_low3;
-                    }
-                }
-                overflow |= carry != 0;
+                // Add each iteration to the `into` array, keeping track of if anything
+                // overflows. The fact that results are being added here is what allows this to
+                // carry between iterations of the `j` loop.
+                overflow |= addmul_1(
+                    &self.limbs,
+                    b,
+                    &mut into.limbs,
+                    j as isize - (PRECISION - 1) as isize,
+                ) != 0;
             }
         }
 
