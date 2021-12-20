@@ -20,7 +20,7 @@
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
-use crate::util::{addmul_1, mul_1};
+use crate::util::{add_n_into, add_n_mut, addmul_1, mul_1, sub_n_into, sub_n_mut};
 
 /// Unsigned integer extended fixed precision implementation.
 ///
@@ -71,19 +71,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(overflow);
     /// ```
     pub fn overflowing_add_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
-        // This implementation is practically identical to the one in GMP.
-        let mut carry = 0u32;
-        let (mut start, mut mid, mut res): (u32, u32, u32);
-
-        for i in (0..PRECISION).rev() {
-            start = self.limbs[i];
-            mid = start.wrapping_add(rhs.limbs[i]);
-            res = mid.wrapping_add(carry);
-            carry = (mid < start) as u32 | (res < mid) as u32;
-            into.limbs[i] = res;
-        }
-
-        carry != 0
+        add_n_into(&self.limbs, &rhs.limbs, &mut into.limbs)
     }
 
     /// Adds `self` and `rhs`, storing the sum into `self, returning `true` if
@@ -99,19 +87,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(overflow);
     /// ```
     pub fn overflowing_add_mut(&mut self, rhs: &UInt<PRECISION>) -> bool {
-        // This implementation is practically identical to the one in GMP.
-        let mut carry = 0u32;
-        let (mut start, mut mid, mut res): (u32, u32, u32);
-
-        for i in (0..PRECISION).rev() {
-            start = self.limbs[i];
-            mid = start.wrapping_add(rhs.limbs[i]);
-            res = mid.wrapping_add(carry);
-            carry = (mid < start) as u32 | (res < mid) as u32;
-            self.limbs[i] = res;
-        }
-
-        carry != 0
+        add_n_mut(&mut self.limbs, &rhs.limbs)
     }
 
     /// Subtracts `rhs` from `self`, storing the difference into `into`,
@@ -139,19 +115,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(underflow);
     /// ```
     pub fn overflowing_sub_into(&self, rhs: &UInt<PRECISION>, into: &mut UInt<PRECISION>) -> bool {
-        // This implementation is practically identical to the one in GMP.
-        let mut borrow = 0u32;
-        let (mut start, mut mid, mut res): (u32, u32, u32);
-
-        for i in (0..PRECISION).rev() {
-            start = self.limbs[i];
-            mid = start.wrapping_sub(rhs.limbs[i]);
-            res = mid.wrapping_sub(borrow);
-            borrow = (mid > start) as u32 | (res > mid) as u32;
-            into.limbs[i] = res;
-        }
-
-        borrow != 0
+        sub_n_into(&self.limbs, &rhs.limbs, &mut into.limbs)
     }
 
     /// Subtracts `rhs` from `self`, storing the difference into `self`,
@@ -167,19 +131,7 @@ impl<const PRECISION: usize> UInt<PRECISION> {
     /// assert!(underflow);
     /// ```
     pub fn overflowing_sub_mut(&mut self, rhs: &UInt<PRECISION>) -> bool {
-        // This implementation is practically identical to the one in GMP.
-        let mut borrow = 0u32;
-        let (mut start, mut mid, mut res): (u32, u32, u32);
-
-        for i in (0..PRECISION).rev() {
-            start = self.limbs[i];
-            mid = start.wrapping_sub(rhs.limbs[i]);
-            res = mid.wrapping_sub(borrow);
-            borrow = (mid > start) as u32 | (res > mid) as u32;
-            self.limbs[i] = res;
-        }
-
-        borrow != 0
+        sub_n_mut(&mut self.limbs, &rhs.limbs)
     }
 
     /// Multiplies `rhs` by `self`, storing the lower half of the result into

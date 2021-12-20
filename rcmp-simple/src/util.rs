@@ -17,6 +17,90 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+/// Adds the multiprecision number `a` the the multiprecision number `b`,
+/// storing the result into `into` and returning true if a carry is required.
+#[inline]
+pub fn add_n_into<const PRECISION: usize>(
+    a: &[u32; PRECISION],
+    b: &[u32; PRECISION],
+    into: &mut [u32; PRECISION],
+) -> bool {
+    // This implementation is practically identical to the one in GMP.
+    let mut carry = 0u32;
+    let (mut start, mut mid, mut res): (u32, u32, u32);
+
+    for i in (0..PRECISION).rev() {
+        start = a[i];
+        mid = start.wrapping_add(b[i]);
+        res = mid.wrapping_add(carry);
+        carry = (mid < start) as u32 | (res < mid) as u32;
+        into[i] = res;
+    }
+
+    carry != 0
+}
+
+/// Adds the multiprecision number `a` to the multiprecision number `b`, storing
+/// the result into `a` and returning true if a carry is required.
+#[inline]
+pub fn add_n_mut<const PRECISION: usize>(a: &mut [u32; PRECISION], b: &[u32; PRECISION]) -> bool {
+    // This implementation is practically identical to the one in GMP.
+    let mut carry = 0u32;
+    let (mut start, mut mid, mut res): (u32, u32, u32);
+
+    for i in (0..PRECISION).rev() {
+        start = a[i];
+        mid = start.wrapping_add(b[i]);
+        res = mid.wrapping_add(carry);
+        carry = (mid < start) as u32 | (res < mid) as u32;
+        a[i] = res;
+    }
+
+    carry != 0
+}
+
+/// Subtracts the multiprecision number `b` from the multiprecision number `a`,
+/// storing the result into `into` and returning true if a borrow is required.
+#[inline]
+pub fn sub_n_into<const PRECISION: usize>(
+    a: &[u32; PRECISION],
+    b: &[u32; PRECISION],
+    into: &mut [u32; PRECISION],
+) -> bool {
+    // This implementation is practically identical to the one in GMP.
+    let mut borrow = 0u32;
+    let (mut start, mut mid, mut res): (u32, u32, u32);
+
+    for i in (0..PRECISION).rev() {
+        start = a[i];
+        mid = start.wrapping_sub(b[i]);
+        res = mid.wrapping_sub(borrow);
+        borrow = (mid > start) as u32 | (res > mid) as u32;
+        into[i] = res;
+    }
+
+    borrow != 0
+}
+
+/// Subtracts the multiprecision number `b` from the multiprecision number `a`,
+/// storing the result into `a` and returning true if a borrow is required.
+#[inline]
+pub fn sub_n_mut<const PRECISION: usize>(a: &mut [u32; PRECISION], b: &[u32; PRECISION]) -> bool {
+    // This implementation is practically identical to the one in GMP.
+    let mut borrow = 0u32;
+    let (mut start, mut mid, mut res): (u32, u32, u32);
+
+    for i in (0..PRECISION).rev() {
+        start = a[i];
+        mid = start.wrapping_sub(b[i]);
+        res = mid.wrapping_sub(borrow);
+        borrow = (mid > start) as u32 | (res > mid) as u32;
+        a[i] = res;
+    }
+
+    borrow != 0
+}
+
 /// This function multiplies two `u32`s together to get the high and low 32-bit
 /// words of the 64-bit result.
 ///
