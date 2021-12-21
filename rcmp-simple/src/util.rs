@@ -276,8 +276,8 @@ pub fn addmul_1_shift<const PRECISION: usize>(
                         (t_low3 << into_neg_bitshift) | (into[k] & ((1 << into_neg_bitshift) - 1));
                 }
                 if k > 1 {
-                    into[k - 1] = (t_low2 << (32 - into_neg_bitshift))
-                        | (into[k - 1] & ((1 << (32 - into_neg_bitshift)) - 1));
+                    into[k - 1] = (t_low3 >> (32 - into_neg_bitshift))
+                        | (into[k - 1] & (!((1 << into_neg_bitshift) - 1)));
                 }
             } else {
                 if k < PRECISION {

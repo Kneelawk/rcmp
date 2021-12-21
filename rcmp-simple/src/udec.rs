@@ -414,4 +414,16 @@ mod tests {
             "The product should be [0x00000000., 0x08000000]"
         )
     }
+
+    #[test]
+    fn multi_precision_mul_5() {
+        let num = UDec::<4, 4>::new([0x40000000, 0x00000004, 0x00000000, 0x00000000]);
+        let prod = num * UDec::new([0x20000000, 0x00000002, 0x00000000, 0x00000000]);
+
+        assert_eq!(
+            prod,
+            UDec::new([0x80000000, 0x00000010, 0x00000000, 0x00000080]),
+            "The product should be [0x8.0000000, 0x00000010, 0x00000000, 0x00000080]"
+        );
+    }
 }
