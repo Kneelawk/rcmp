@@ -206,6 +206,91 @@ pub fn addmul_1<const PRECISION: usize>(
     carry
 }
 
+/// Sets the contents of `into` to zero.
+pub fn zero<const PRECISION: usize>(into: &mut [u32; PRECISION]) {
+    for i in 0..PRECISION {
+        into[i] = 0;
+    }
+}
+
+/// Multiplies the multiprecision number `a` by the single-precision number
+/// `b`, adding the result into `into` and returning the overflow.
+#[inline]
+pub fn addmul_1_shift<const PRECISION: usize>(
+    a: &[u32; PRECISION],
+    b: u32,
+    into: &mut [u32; PRECISION],
+    into_offset: isize,
+    into_neg_bitshift: u32,
+) -> u32 {
+    // If `into_neg_bitshift` is greater than 0, then we're also carrying bits from
+    // the `k-1` index of `into`.
+    let do_bitshift = into_neg_bitshift > 0;
+
+    // Here, we're adding up every limb multiplied by `b`.
+    let mut carry = 0u32;
+    for i in (0..PRECISION).rev() {
+        // We only care about part of the multiplication result, so we add the index
+        // offset and only evaluate the areas where the new index is valid.
+        let k = i as isize + into_offset;
+        if k >= 0 && k <= PRECISION as isize {
+            let k = k as usize;
+
+            // Perform the multiplication.
+            let (t_high, t_low) = mul_hi_low(a[i], b);
+
+            // Grab the bit-shifted carry from the `into` array.
+            let prev = if do_bitshift {
+                (if k < PRECISION {
+                    into[k] >> into_neg_bitshift
+                } else {
+                    0
+                }) | (if k > 1 {
+                    into[k - 1] << (32 - into_neg_bitshift)
+                } else {
+                    0
+                })
+            } else {
+                if k < PRECISION {
+                    into[k]
+                } else {
+                    0
+                }
+            };
+
+            // Add anything else that was already in this limb. This is how carries
+            // work across outer multiplication loops.
+            let t_low2 = t_low.wrapping_add(prev);
+            let t_high2 = t_high + (t_low2 < t_low) as u32;
+
+            // Add the carry.
+            let t_low3 = t_low2.wrapping_add(carry);
+
+            // Next we assign the least-significant 32 bits into the current limb and
+            // carry everything left over to the next limb.
+            carry = t_high2 + (t_low3 < t_low2) as u32;
+
+            if do_bitshift {
+                if k < PRECISION {
+                    into[k] =
+                        (t_low3 << into_neg_bitshift) | (into[k] & ((1 << into_neg_bitshift) - 1));
+                }
+                if k > 1 {
+                    into[k - 1] = (t_low2 << (32 - into_neg_bitshift))
+                        | (into[k - 1] & ((1 << (32 - into_neg_bitshift)) - 1));
+                }
+            } else {
+                if k < PRECISION {
+                    into[k] = t_low3;
+                }
+            }
+        }
+    }
+
+    // Return the carry.
+    carry
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::mul_hi_low;

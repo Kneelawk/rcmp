@@ -6,3 +6,4 @@ authors = ["Kneelawk <kneelawk@gmail.com>"]
 description = "A simple concept implementation of multiprecision algorithms in rust."
 
 [dependencies]
+itertools = "^0.10.3"
