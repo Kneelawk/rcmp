@@ -25,7 +25,9 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::util::{add_n_into, add_n_mut, addmul_1_shift, sub_n_into, sub_n_mut, zero};
+use crate::util::{
+    add_n_into, add_n_mut, addmul_1_full, sub_n_into, sub_n_mut,
+};
 
 /// Unsigned decimal extended fixed precision implementation with fixed point.
 ///
@@ -177,56 +179,64 @@ impl<const PRECISION: usize, const POINT: u32> UDec<PRECISION, POINT> {
         &self,
         rhs: &UDec<PRECISION, POINT>,
         into: &mut UDec<PRECISION, POINT>,
-    ) -> bool {
-        // Zero `into` so we don't end up with garbage data impacting our calculations.
-        zero(&mut into.limbs);
+    ) -> bool
+    where
+        [(); PRECISION * 2]:,
+    {
+        // Create temporary storage for intermediate (non-bit-shifted, double-PRECISION)
+        // results of multiplication.
+        let mut temp = [0u32; PRECISION * 2];
 
-        // Calculate the bitshift
-        let into_neg_bitshift = POINT & 0x1F;
-
-        let mut overflow = false;
-
+        // Perform the multilication.
         for j in (0..PRECISION).rev() {
             let b = rhs.limbs[j];
 
             // Here, we're multiplying everything by `b` so if `b == 0` then nothing is
             // happening, so let's just skip it entirely.
             if b != 0 {
-                let into_offset = j as isize + 1 - (POINT / 32) as isize;
+                // Add each iteration to the `into` array. Note that this will never overflow.
+                // The fact that results are being added here is what allows
+                // this to carry between iterations of the `j` loop.
+                let carry = addmul_1_full(&self.limbs, b, &mut temp, j + 1);
 
-                // Add each iteration to the `into` array, keeping track of if anything
-                // overflows. The fact that results are being added here is what allows this to
-                // carry between iterations of the `j` loop.
-                let carry = addmul_1_shift(
-                    &self.limbs,
-                    b,
-                    &mut into.limbs,
-                    into_offset,
-                    into_neg_bitshift,
-                );
-
-                if carry != 0 {
-                    if into_offset > 0 {
-                        let into_offset = into_offset as usize;
-                        // Add carry into `into` because the most-significant word `addmul` added
-                        // into was still not the most significant word in
-                        // `into`.
-
-                        // Here we split carry into two pieces, one added to the part
-                        let carry_l = carry << into_neg_bitshift;
-                        let carry_h = carry.checked_shr(32 - into_neg_bitshift).unwrap_or(0);
-
-                        into.limbs[into_offset - 1] = carry_l;
-                        if into_offset > 1 {
-                            into.limbs[into_offset - 2] = carry_h;
-                        } else {
-                            overflow |= carry_h != 0;
-                        }
-                    } else {
-                        overflow |= carry != 0;
-                    }
-                }
+                // Note that `j` never increases, so `temp[j]` will always be zero before we
+                // set it here, meaning that no addition is necessary.
+                temp[j] = carry;
             }
+        }
+
+        // Calculate the bitshift and wordshift
+        let bitshift = POINT & 0x1F;
+        let wordshift = (POINT >> 5) as usize;
+
+        // Perform a bit-shifted copy into the `into` structure, discarding anything
+        // outside our precision and keeping track of anything overflowing our
+        // precision.
+        for i in (0..PRECISION).rev() {
+            let h = i + wordshift;
+
+            if bitshift == 0 {
+                into.limbs[i] = temp[h];
+            } else {
+                into.limbs[i] = (temp[h] << bitshift) | (temp[h + 1] >> (32 - bitshift));
+            }
+        }
+
+        // Note that overflow calculation is separate and may be omitted if not needed.
+        let mut overflow = false;
+
+        // Check whether each of the remaining words is zero.
+        for i in (0..wordshift).rev() {
+            if bitshift == 0 {
+                overflow |= temp[i] != 0;
+            } else {
+                overflow |= (temp[i] << bitshift) | (temp[i + 1] >> (32 - bitshift)) != 0;
+            }
+        }
+
+        // Check whether the remaining bits are zero.
+        if bitshift != 0 {
+            overflow |= temp[0] >> (32 - bitshift) != 0;
         }
 
         overflow
@@ -285,7 +295,10 @@ impl<const PRECISION: usize, const POINT: u32> Sub for UDec<PRECISION, POINT> {
     }
 }
 
-impl<const PRECISION: usize, const POINT: u32> Mul for UDec<PRECISION, POINT> {
+impl<const PRECISION: usize, const POINT: u32> Mul for UDec<PRECISION, POINT>
+where
+    [(); PRECISION * 2]:,
+{
     type Output = Self;
 
     /// Performs the `*` operation.
@@ -325,7 +338,10 @@ impl<const PRECISION: usize, const POINT: u32> SubAssign for UDec<PRECISION, POI
     }
 }
 
-impl<const PRECISION: usize, const POINT: u32> MulAssign for UDec<PRECISION, POINT> {
+impl<const PRECISION: usize, const POINT: u32> MulAssign for UDec<PRECISION, POINT>
+where
+    [(); PRECISION * 2]:,
+{
     /// Performs the `*=` operation.
     ///
     /// # Panics

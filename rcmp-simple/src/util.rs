@@ -206,85 +206,46 @@ pub fn addmul_1<const PRECISION: usize>(
     carry
 }
 
-/// Sets the contents of `into` to zero.
-pub fn zero<const PRECISION: usize>(into: &mut [u32; PRECISION]) {
-    for i in 0..PRECISION {
-        into[i] = 0;
-    }
-}
-
-/// Multiplies the multiprecision number `a` by the single-precision number
-/// `b`, adding the result into `into` and returning the overflow.
+/// Multiplies the multiprecision number `a` by the single-precision number `b`,
+/// storing the result into `into` and returning the carry word.
+///
+/// This variant is designed to store the entire results of multiplication, not
+/// just the least-significant results. This means that the carry word for
+/// multiplication when `b` is an MSW should always be 0.
 #[inline]
-pub fn addmul_1_shift<const PRECISION: usize>(
+pub fn addmul_1_full<const PRECISION: usize>(
     a: &[u32; PRECISION],
     b: u32,
-    into: &mut [u32; PRECISION],
-    into_offset: isize,
-    into_neg_bitshift: u32,
+    into: &mut [u32; PRECISION * 2],
+    into_offset: usize,
 ) -> u32 {
-    // If `into_neg_bitshift` is greater than 0, then we're also carrying bits from
-    // the `k-1` index of `into`.
-    let do_bitshift = into_neg_bitshift > 0;
+    // This should never happen so let's make an assertion that should hopefully
+    // show us if something is broken during unit-testing.
+    debug_assert!(
+        into_offset <= PRECISION,
+        "into_offset should always be less or equal than PRECISION"
+    );
 
     // Here, we're adding up every limb multiplied by `b`.
     let mut carry = 0u32;
     for i in (0..PRECISION).rev() {
-        // We only care about part of the multiplication result, so we add the index
-        // offset and only evaluate the areas where the new index is valid.
-        let k = i as isize + into_offset;
-        if k >= 0 && k <= PRECISION as isize {
-            let k = k as usize;
+        let k = i + into_offset;
 
-            // Perform the multiplication.
-            let (t_high, t_low) = mul_hi_low(a[i], b);
+        // Perform the multiplication.
+        let (t_high, t_low) = mul_hi_low(a[i], b);
 
-            // Grab the bit-shifted carry from the `into` array.
-            let prev = if do_bitshift {
-                (if k < PRECISION {
-                    into[k] >> into_neg_bitshift
-                } else {
-                    0
-                }) | (if k > 1 {
-                    into[k - 1] << (32 - into_neg_bitshift)
-                } else {
-                    0
-                })
-            } else {
-                if k < PRECISION {
-                    into[k]
-                } else {
-                    0
-                }
-            };
+        // Add anything else that was already in this limb. This is how carries
+        // work across outer multiplication loops.
+        let t_low2 = t_low.wrapping_add(into[k]);
+        let t_high2 = t_high + (t_low2 < t_low) as u32;
 
-            // Add anything else that was already in this limb. This is how carries
-            // work across outer multiplication loops.
-            let t_low2 = t_low.wrapping_add(prev);
-            let t_high2 = t_high + (t_low2 < t_low) as u32;
+        // Add the carry.
+        let t_low3 = t_low2.wrapping_add(carry);
 
-            // Add the carry.
-            let t_low3 = t_low2.wrapping_add(carry);
-
-            // Next we assign the least-significant 32 bits into the current limb and
-            // carry everything left over to the next limb.
-            carry = t_high2 + (t_low3 < t_low2) as u32;
-
-            if do_bitshift {
-                if k < PRECISION {
-                    into[k] =
-                        (t_low3 << into_neg_bitshift) | (into[k] & ((1 << into_neg_bitshift) - 1));
-                }
-                if k > 1 {
-                    into[k - 1] = (t_low3 >> (32 - into_neg_bitshift))
-                        | (into[k - 1] & (!((1 << into_neg_bitshift) - 1)));
-                }
-            } else {
-                if k < PRECISION {
-                    into[k] = t_low3;
-                }
-            }
-        }
+        // Next we assign the least-significant 32 bits into the current limb and
+        // carry everything left over to the next limb.
+        carry = t_high2 + (t_low3 < t_low2) as u32;
+        into[k] = t_low3;
     }
 
     // Return the carry.

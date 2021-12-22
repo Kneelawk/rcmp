@@ -15,6 +15,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Using complicated featurs like this one is ok because we can emulate similar
+// things in the WGSL implementation using macros.
+#![feature(generic_const_exprs)]
+
 //! # About
 //! This library is a simple concept implementation of multiprecision algorithms
 //! in rust. The name RCMP stands for Rust Concept Multi-Precision. This library
